@@ -2,13 +2,14 @@ package app.revanced.patches.music.misc.gms
 
 import app.revanced.patches.music.misc.gms.Constants.MUSIC_PACKAGE_NAME
 import app.revanced.patches.music.misc.gms.Constants.REVANCED_MUSIC_PACKAGE_NAME
-import app.revanced.patches.music.misc.gms.GmsCoreSupportResourcePatch.gmsCoreVendorOption
+import app.revanced.patches.music.misc.gms.GmsCoreSupportResourcePatch.gmsCoreVendorGroupIdOption
 import app.revanced.patches.music.misc.gms.fingerprints.*
-import app.revanced.patches.shared.misc.gms.AbstractGmsCoreSupportPatch
-import app.revanced.patches.youtube.misc.gms.fingerprints.CastContextFetchFingerprint
+import app.revanced.patches.music.misc.integrations.IntegrationsPatch
+import app.revanced.patches.shared.fingerprints.CastContextFetchFingerprint
+import app.revanced.patches.shared.misc.gms.BaseGmsCoreSupportPatch
 
 @Suppress("unused")
-object GmsCoreSupportPatch : AbstractGmsCoreSupportPatch(
+object GmsCoreSupportPatch : BaseGmsCoreSupportPatch(
     fromPackageName = MUSIC_PACKAGE_NAME,
     toPackageName = REVANCED_MUSIC_PACKAGE_NAME,
     primeMethodFingerprint = PrimeMethodFingerprint,
@@ -19,7 +20,9 @@ object GmsCoreSupportPatch : AbstractGmsCoreSupportPatch(
         CastDynamiteModuleV2Fingerprint,
         CastContextFetchFingerprint,
     ),
-    abstractGmsCoreSupportResourcePatch = GmsCoreSupportResourcePatch,
+    mainActivityOnCreateFingerprint = MusicActivityOnCreateFingerprint,
+    integrationsPatchDependency = IntegrationsPatch::class,
+    gmsCoreSupportResourcePatch = GmsCoreSupportResourcePatch,
     compatiblePackages = setOf(CompatiblePackage("com.google.android.apps.youtube.music")),
     fingerprints = setOf(
         ServiceCheckFingerprint,
@@ -28,7 +31,7 @@ object GmsCoreSupportPatch : AbstractGmsCoreSupportPatch(
         CastDynamiteModuleV2Fingerprint,
         CastContextFetchFingerprint,
         PrimeMethodFingerprint,
-    )
+    ),
 ) {
-    override val gmsCoreVendor by gmsCoreVendorOption
+    override val gmsCoreVendorGroupId by gmsCoreVendorGroupIdOption
 }

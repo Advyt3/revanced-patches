@@ -1,20 +1,18 @@
 package app.revanced.patches.youtube.misc.gms
 
-import app.revanced.patcher.data.BytecodeContext
-import app.revanced.patcher.extensions.InstructionExtensions.addInstruction
-import app.revanced.patches.shared.fingerprints.HomeActivityFingerprint
-import app.revanced.patches.shared.misc.gms.AbstractGmsCoreSupportPatch
+import app.revanced.patches.shared.fingerprints.CastContextFetchFingerprint
+import app.revanced.patches.shared.misc.gms.BaseGmsCoreSupportPatch
 import app.revanced.patches.youtube.layout.buttons.cast.HideCastButtonPatch
 import app.revanced.patches.youtube.misc.fix.playback.ClientSpoofPatch
 import app.revanced.patches.youtube.misc.gms.Constants.REVANCED_YOUTUBE_PACKAGE_NAME
 import app.revanced.patches.youtube.misc.gms.Constants.YOUTUBE_PACKAGE_NAME
-import app.revanced.patches.youtube.misc.gms.GmsCoreSupportResourcePatch.gmsCoreVendorOption
+import app.revanced.patches.youtube.misc.gms.GmsCoreSupportResourcePatch.gmsCoreVendorGroupIdOption
 import app.revanced.patches.youtube.misc.gms.fingerprints.*
-import app.revanced.util.exception
-
+import app.revanced.patches.youtube.misc.integrations.IntegrationsPatch
+import app.revanced.patches.youtube.shared.fingerprints.MainActivityOnCreateFingerprint
 
 @Suppress("unused")
-object GmsCoreSupportPatch : AbstractGmsCoreSupportPatch(
+object GmsCoreSupportPatch : BaseGmsCoreSupportPatch(
     fromPackageName = YOUTUBE_PACKAGE_NAME,
     toPackageName = REVANCED_YOUTUBE_PACKAGE_NAME,
     primeMethodFingerprint = PrimeMethodFingerprint,
@@ -23,25 +21,34 @@ object GmsCoreSupportPatch : AbstractGmsCoreSupportPatch(
         GooglePlayUtilityFingerprint,
         CastDynamiteModuleFingerprint,
         CastDynamiteModuleV2Fingerprint,
-        CastContextFetchFingerprint
+        CastContextFetchFingerprint,
     ),
+    mainActivityOnCreateFingerprint = MainActivityOnCreateFingerprint,
+    integrationsPatchDependency = IntegrationsPatch::class,
     dependencies = setOf(
         HideCastButtonPatch::class,
-        ClientSpoofPatch::class
+        ClientSpoofPatch::class,
     ),
-    abstractGmsCoreSupportResourcePatch = GmsCoreSupportResourcePatch,
+    gmsCoreSupportResourcePatch = GmsCoreSupportResourcePatch,
     compatiblePackages = setOf(
         CompatiblePackage(
-            "com.google.android.youtube", setOf(
-                "18.32.39",
-                "18.37.36",
-                "18.38.44",
-                "18.43.45",
-                "18.44.41",
-                "18.45.41",
-                "18.45.43"
-            )
-        )
+            "com.google.android.youtube",
+            setOf(
+                "18.48.39",
+                "18.49.37",
+                "19.01.34",
+                "19.02.39",
+                "19.03.36",
+                "19.04.38",
+                "19.05.36",
+                "19.06.39",
+                "19.07.40",
+                "19.08.36",
+                "19.09.38",
+                "19.10.39",
+                "19.11.43"
+            ),
+        ),
     ),
     fingerprints = setOf(
         ServiceCheckFingerprint,
@@ -50,18 +57,7 @@ object GmsCoreSupportPatch : AbstractGmsCoreSupportPatch(
         CastDynamiteModuleV2Fingerprint,
         CastContextFetchFingerprint,
         PrimeMethodFingerprint,
-        HomeActivityFingerprint,
-    )
+    ),
 ) {
-    override val gmsCoreVendor by gmsCoreVendorOption
-
-    override fun execute(context: BytecodeContext) {
-        // Check the availability of GmsCore.
-        HomeActivityFingerprint.result?.mutableMethod?.addInstruction(
-            0,
-            "invoke-static {}, Lapp/revanced/integrations/patches/GmsCoreSupport;->checkAvailability()V"
-        ) ?: throw HomeActivityFingerprint.exception
-
-        super.execute(context)
-    }
+    override val gmsCoreVendorGroupId by gmsCoreVendorGroupIdOption
 }

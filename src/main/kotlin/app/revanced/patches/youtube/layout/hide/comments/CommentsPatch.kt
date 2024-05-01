@@ -4,18 +4,19 @@ import app.revanced.patcher.data.ResourceContext
 import app.revanced.patcher.patch.ResourcePatch
 import app.revanced.patcher.patch.annotation.CompatiblePackage
 import app.revanced.patcher.patch.annotation.Patch
-import app.revanced.patches.shared.settings.preference.impl.PreferenceScreen
-import app.revanced.patches.shared.settings.preference.impl.StringResource
-import app.revanced.patches.shared.settings.preference.impl.SwitchPreference
+import app.revanced.patches.all.misc.resources.AddResourcesPatch
+import app.revanced.patches.shared.misc.settings.preference.PreferenceScreen
+import app.revanced.patches.shared.misc.settings.preference.SwitchPreference
 import app.revanced.patches.youtube.misc.litho.filter.LithoFilterPatch
 import app.revanced.patches.youtube.misc.settings.SettingsPatch
 
 @Patch(
     name = "Comments",
-    description = "Hides components related to comments.",
+    description = "Adds options to hide components related to comments.",
     dependencies = [
         SettingsPatch::class,
-        LithoFilterPatch::class
+        LithoFilterPatch::class,
+        AddResourcesPatch::class
     ],
     compatiblePackages = [
         CompatiblePackage(
@@ -26,8 +27,20 @@ import app.revanced.patches.youtube.misc.settings.SettingsPatch
                 "18.38.44",
                 "18.43.45",
                 "18.44.41",
-                "18.45.41",
-                "18.45.43"
+                "18.45.43",
+                "18.48.39",
+                "18.49.37",
+                "19.01.34",
+                "19.02.39",
+                "19.03.36",
+                "19.04.38",
+                "19.05.36",
+                "19.06.39",
+                "19.07.40",
+                "19.08.36",
+                "19.09.38",
+                "19.10.39",
+                "19.11.43"
             ]
         )
     ]
@@ -35,31 +48,22 @@ import app.revanced.patches.youtube.misc.settings.SettingsPatch
 @Suppress("unused")
 object CommentsPatch : ResourcePatch() {
     private const val FILTER_CLASS_DESCRIPTOR =
-        "Lapp/revanced/integrations/patches/components/CommentsFilter;"
+        "Lapp/revanced/integrations/youtube/patches/components/CommentsFilter;"
 
     override fun execute(context: ResourceContext) {
-        LithoFilterPatch.addFilter(FILTER_CLASS_DESCRIPTOR)
-        
-        SettingsPatch.PreferenceScreen.LAYOUT.addPreferences(
+        AddResourcesPatch(this::class)
+
+        SettingsPatch.PreferenceScreen.PLAYER.addPreferences(
             PreferenceScreen(
-                "revanced_comments_preference_screen",
-                StringResource("revanced_comments_preference_screen_title", "Comments"),
-                listOf(
-                    SwitchPreference(
-                        "revanced_hide_comments_section",
-                        StringResource("revanced_hide_comments_section_title", "Hide comments section"),
-                        StringResource("revanced_hide_comments_section_summary_on", "Comment section is hidden"),
-                        StringResource("revanced_hide_comments_section_summary_off", "Comment section is shown")
-                    ),
-                    SwitchPreference(
-                        "revanced_hide_preview_comment",
-                        StringResource("revanced_hide_preview_comment_title", "Hide preview comment"),
-                        StringResource("revanced_hide_preview_comment_on", "Preview comment is hidden"),
-                        StringResource("revanced_hide_preview_comment_off", "Preview comment is shown")
-                    )
+                "revanced_comments_screen",
+                preferences = setOf(
+                    SwitchPreference("revanced_hide_preview_comment"),
+                    SwitchPreference("revanced_hide_comments_section")
                 ),
-                StringResource("revanced_comments_preference_screen_summary", "Manage the visibility of comments section components")
+                sorting = PreferenceScreen.Sorting.UNSORTED
             )
         )
+
+        LithoFilterPatch.addFilter(FILTER_CLASS_DESCRIPTOR)
     }
 }
