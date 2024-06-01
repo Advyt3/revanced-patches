@@ -10,21 +10,22 @@ import java.io.Closeable
 
 @Patch(
     name = "Change package name",
-    description = "Appends \".revanced\" to the package name by default.",
-    use = false
+    description = "Appends \".revanced\" to the package name by default. Changing the package name of the app can lead to unexpected issues.",
+    use = false,
 )
 @Suppress("unused")
 object ChangePackageNamePatch : ResourcePatch(), Closeable {
-    private val packageNameOption = stringPatchOption(
-        key = "packageName",
-        default = "Default",
-        values = mapOf("Default" to "Default"),
-        title = "Package name",
-        description = "The name of the package to rename the app to.",
-        required = true
-    ) {
-        it == "Default" || it!!.matches(Regex("^[a-z]\\w*(\\.[a-z]\\w*)+\$"))
-    }
+    private val packageNameOption =
+        stringPatchOption(
+            key = "packageName",
+            default = "Default",
+            values = mapOf("Default" to "Default"),
+            title = "Package name",
+            description = "The name of the package to rename the app to.",
+            required = true,
+        ) {
+            it == "Default" || it!!.matches(Regex("^[a-z]\\w*(\\.[a-z]\\w*)+\$"))
+        }
 
     private lateinit var context: ResourceContext
 
@@ -41,22 +42,29 @@ object ChangePackageNamePatch : ResourcePatch(), Closeable {
      * @throws PatchOptionException.ValueValidationException If the package name is invalid.
      */
     fun setOrGetFallbackPackageName(fallbackPackageName: String): String {
-        val packageName = this.packageNameOption.value!!
+        val packageName = packageNameOption.value!!
 
-        return if (packageName == this.packageNameOption.default)
-            fallbackPackageName.also { this.packageNameOption.value = it }
-        else
+        return if (packageName == packageNameOption.default) {
+            fallbackPackageName.also { packageNameOption.value = it }
+        } else {
             packageName
+        }
     }
 
-    override fun close() = context.xmlEditor["AndroidManifest.xml"].use { editor ->
-        val manifest = editor.file.getElementsByTagName("manifest").item(0) as Element
-        val originalPackageName = manifest.getAttribute("package")
+    override fun close() =
+        context.xmlEditor["AndroidManifest.xml"].use { editor ->
+            val document = editor.file
 
-        var replacementPackageName = this.packageNameOption.value
-        if (replacementPackageName == this.packageNameOption.default)
-            replacementPackageName = "$originalPackageName.revanced"
+            val replacementPackageName = packageNameOption.value
 
-        manifest.setAttribute("package", replacementPackageName)
-    }
+            val manifest = document.getElementsByTagName("manifest").item(0) as Element
+            manifest.setAttribute(
+                "package",
+                if (replacementPackageName != packageNameOption.default) {
+                    replacementPackageName
+                } else {
+                    "${manifest.getAttribute("package")}.revanced"
+                },
+            )
+        }
 }

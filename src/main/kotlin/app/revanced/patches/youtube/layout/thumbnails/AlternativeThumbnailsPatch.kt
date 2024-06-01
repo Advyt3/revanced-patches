@@ -10,7 +10,11 @@ import app.revanced.patcher.patch.annotation.CompatiblePackage
 import app.revanced.patcher.patch.annotation.Patch
 import app.revanced.patcher.util.proxy.mutableTypes.MutableMethod
 import app.revanced.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
-import app.revanced.patches.shared.settings.preference.impl.*
+import app.revanced.patches.all.misc.resources.AddResourcesPatch
+import app.revanced.patches.shared.misc.settings.preference.ListPreference
+import app.revanced.patches.shared.misc.settings.preference.NonInteractivePreference
+import app.revanced.patches.shared.misc.settings.preference.SwitchPreference
+import app.revanced.patches.shared.misc.settings.preference.TextPreference
 import app.revanced.patches.youtube.layout.thumbnails.fingerprints.MessageDigestImageUrlFingerprint
 import app.revanced.patches.youtube.layout.thumbnails.fingerprints.MessageDigestImageUrlParentFingerprint
 import app.revanced.patches.youtube.layout.thumbnails.fingerprints.cronet.RequestFingerprint
@@ -18,8 +22,9 @@ import app.revanced.patches.youtube.layout.thumbnails.fingerprints.cronet.reques
 import app.revanced.patches.youtube.layout.thumbnails.fingerprints.cronet.request.callback.OnResponseStartedFingerprint
 import app.revanced.patches.youtube.layout.thumbnails.fingerprints.cronet.request.callback.OnSucceededFingerprint
 import app.revanced.patches.youtube.misc.integrations.IntegrationsPatch
+import app.revanced.patches.youtube.misc.navigation.NavigationBarHookPatch
 import app.revanced.patches.youtube.misc.settings.SettingsPatch
-import app.revanced.util.exception
+import app.revanced.util.resultOrThrow
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
@@ -29,8 +34,13 @@ import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 
 @Patch(
     name = "Alternative thumbnails",
-    description = "Adds options to replace video thumbnails with still image captures of the video.",
-    dependencies = [IntegrationsPatch::class, SettingsPatch::class, AlternativeThumbnailsResourcePatch::class],
+    description = "Adds options to replace video thumbnails using the DeArrow API or image captures from the video.",
+    dependencies = [
+        IntegrationsPatch::class,
+        SettingsPatch::class,
+        AddResourcesPatch::class,
+        NavigationBarHookPatch::class
+    ],
     compatiblePackages = [
         CompatiblePackage(
             "com.google.android.youtube",
@@ -40,11 +50,23 @@ import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
                 "18.38.44",
                 "18.43.45",
                 "18.44.41",
-                "18.45.41",
-                "18.45.43"
-            ]
-        )
-    ]
+                "18.45.43",
+                "18.48.39",
+                "18.49.37",
+                "19.01.34",
+                "19.02.39",
+                "19.03.36",
+                "19.04.38",
+                "19.05.36",
+                "19.06.39",
+                "19.07.40",
+                "19.08.36",
+                "19.09.38",
+                "19.10.39",
+                "19.11.43"
+            ],
+        ),
+    ],
 )
 @Suppress("unused")
 object AlternativeThumbnailsPatch : BytecodePatch(
@@ -52,10 +74,10 @@ object AlternativeThumbnailsPatch : BytecodePatch(
         MessageDigestImageUrlParentFingerprint,
         OnResponseStartedFingerprint,
         RequestFingerprint,
-    )
+    ),
 ) {
     private const val INTEGRATIONS_CLASS_DESCRIPTOR =
-        "Lapp/revanced/integrations/patches/AlternativeThumbnailsPatch;"
+        "Lapp/revanced/integrations/youtube/patches/AlternativeThumbnailsPatch;"
 
     private lateinit var loadImageUrlMethod: MutableMethod
     private var loadImageUrlIndex = 0
@@ -76,7 +98,7 @@ object AlternativeThumbnailsPatch : BytecodePatch(
             """
                 invoke-static { p1 }, $targetMethodClass->overrideImageURL(Ljava/lang/String;)Ljava/lang/String;
                 move-result-object p1
-                """
+                """,
         )
         loadImageUrlIndex += 2
     }
@@ -90,7 +112,7 @@ object AlternativeThumbnailsPatch : BytecodePatch(
         loadImageSuccessCallbackMethod.addInstruction(
             loadImageSuccessCallbackIndex++,
             "invoke-static { p1, p2 }, $targetMethodClass->handleCronetSuccess(" +
-                    "Lorg/chromium/net/UrlRequest;Lorg/chromium/net/UrlResponseInfo;)V"
+                "Lorg/chromium/net/UrlRequest;Lorg/chromium/net/UrlResponseInfo;)V",
         )
     }
 
@@ -102,131 +124,60 @@ object AlternativeThumbnailsPatch : BytecodePatch(
         loadImageErrorCallbackMethod.addInstruction(
             loadImageErrorCallbackIndex++,
             "invoke-static { p1, p2, p3 }, $targetMethodClass->handleCronetFailure(" +
-                    "Lorg/chromium/net/UrlRequest;Lorg/chromium/net/UrlResponseInfo;Ljava/io/IOException;)V"
+                "Lorg/chromium/net/UrlRequest;Lorg/chromium/net/UrlResponseInfo;Ljava/io/IOException;)V",
         )
     }
 
     override fun execute(context: BytecodeContext) {
-        SettingsPatch.PreferenceScreen.LAYOUT.addPreferences(
-            PreferenceScreen(
-                "revanced_alt_thumbnail_preference_screen",
-                StringResource("revanced_alt_thumbnail_preference_screen_title", "Alternative thumbnails"),
-                listOf(
-                    NonInteractivePreference(
-                        StringResource("revanced_alt_thumbnail_about_title", "Thumbnails in use"),
-                        null, // Summary is dynamically updated based on the current settings.
-                        tag = "app.revanced.integrations.settingsmenu.AlternativeThumbnailsStatusPreference"
-                    ),
-                    SwitchPreference(
-                        "revanced_alt_thumbnail_dearrow",
-                        StringResource("revanced_alt_thumbnail_dearrow_title", "Enable DeArrow"),
-                        StringResource("revanced_alt_thumbnail_dearrow_summary_on", "Using DeArrow"),
-                        StringResource("revanced_alt_thumbnail_dearrow_summary_off", "Not using DeArrow")
-                    ),
-                    SwitchPreference(
-                        "revanced_alt_thumbnail_dearrow_connection_toast",
-                        StringResource("revanced_alt_thumbnail_dearrow_connection_toast_title", "Show a toast if API is not available"),
-                        StringResource("revanced_alt_thumbnail_dearrow_connection_toast_summary_on", "Toast is shown if DeArrow is not available"),
-                        StringResource("revanced_alt_thumbnail_dearrow_connection_toast_summary_off", "Toast is not shown if DeArrow is not available")
-                    ),
-                    TextPreference(
-                        "revanced_alt_thumbnail_dearrow_api_url",
-                        StringResource(
-                            "revanced_alt_thumbnail_dearrow_api_url_title",
-                            "DeArrow API endpoint"
-                        ),
-                        StringResource(
-                            "revanced_alt_thumbnail_dearrow_api_url_summary",
-                            "The URL of the DeArrow thumbnail cache endpoint. " +
-                                    "Do not change this unless you know what you\\\'re doing"
-                        ),
-                    ),
-                    NonInteractivePreference(
-                        StringResource(
-                            "revanced_alt_thumbnail_dearrow_about_title",
-                            "About DeArrow"
-                        ),
-                        StringResource(
-                            "revanced_alt_thumbnail_dearrow_about_summary",
-                            "DeArrow provides crowd-sourced thumbnails for YouTube videos. " +
-                                    "These thumbnails are often more relevant than those provided by YouTube. " +
-                                    "If enabled, video URLs will be sent to the API server and no other data is sent."
-                                    + "\\n\\nTap here to learn more about DeArrow"
-                        ),
-                        // Custom about preference with link to the DeArrow website.
-                        tag = "app.revanced.integrations.settingsmenu.AlternativeThumbnailsAboutDeArrowPreference",
-                        selectable = true
-                    ),
-                    SwitchPreference(
-                        "revanced_alt_thumbnail_stills",
-                        StringResource("revanced_alt_thumbnail_stills_title", "Enable still video captures"),
-                        StringResource("revanced_alt_thumbnail_stills_summary_on", "Using YouTube still video captures"),
-                        StringResource("revanced_alt_thumbnail_stills_summary_off", "Not using YouTube still video captures")
-                    ),
-                    ListPreference(
-                        "revanced_alt_thumbnail_stills_time",
-                        StringResource("revanced_alt_thumbnail_stills_time_title", "Video time to take the still from"),
-                        ArrayResource(
-                            "revanced_alt_thumbnail_type_entries",
-                            listOf(
-                                StringResource("revanced_alt_thumbnail_stills_time_entry_1", "Beginning of video"),
-                                StringResource("revanced_alt_thumbnail_stills_time_entry_2", "Middle of video"),
-                                StringResource("revanced_alt_thumbnail_stills_time_entry_3", "End of video"),
-                            )
-                        ),
-                        ArrayResource(
-                            "revanced_alt_thumbnail_stills_time_entry_values",
-                            listOf(
-                                StringResource("revanced_alt_thumbnail_stills_time_entry_value_1", "1"),
-                                StringResource("revanced_alt_thumbnail_stills_time_entry_value_2", "2"),
-                                StringResource("revanced_alt_thumbnail_stills_time_entry_value_3", "3"),
-                            )
-                        )
-                    ),
-                    SwitchPreference(
-                        "revanced_alt_thumbnail_stills_fast",
-                        StringResource(
-                            "revanced_alt_thumbnail_stills_fast_title",
-                            "Use fast still captures"
-                        ),
-                        StringResource(
-                            "revanced_alt_thumbnail_stills_fast_summary_on",
-                            "Using medium quality still captures. " +
-                                    "Thumbnails will load faster, but live streams, unreleased, " +
-                                    "or very old videos may show blank thumbnails"
-                        ),
-                        StringResource(
-                            "revanced_alt_thumbnail_stills_fast_summary_off",
-                            "Using high quality still captures"
-                        )
-                    ),
-                    NonInteractivePreference(
-                        StringResource(
-                            "revanced_alt_thumbnail_stills_about_title",
-                            "About still video captures"
-                        ),
-                        StringResource(
-                            "revanced_alt_thumbnail_stills_about_summary",
-                            "Still captures are taken from the beginning/middle/end of each video. " +
-                                    "These images are built into YouTube and no external API is used"
-                        ),
-                        // Restore the preference dividers to keep it from looking weird.
-                        selectable = true
-                    )
-                ),
-                StringResource("revanced_alt_thumbnail_preference_screen_summary", "Video thumbnail settings")
-            )
+        AddResourcesPatch(this::class)
+
+        val entries = "revanced_alt_thumbnail_options_entries"
+        val values = "revanced_alt_thumbnail_options_entry_values"
+        SettingsPatch.PreferenceScreen.ALTERNATIVE_THUMBNAILS.addPreferences(
+            ListPreference("revanced_alt_thumbnail_home",
+                summaryKey = null,
+                entriesKey = entries,
+                entryValuesKey = values
+            ),
+            ListPreference("revanced_alt_thumbnail_subscription",
+                summaryKey = null,
+                entriesKey = entries,
+                entryValuesKey = values
+            ),
+            ListPreference("revanced_alt_thumbnail_library",
+                summaryKey = null,
+                entriesKey = entries,
+                entryValuesKey = values
+            ),
+            ListPreference("revanced_alt_thumbnail_player",
+                summaryKey = null,
+                entriesKey = entries,
+                entryValuesKey = values
+            ),
+            ListPreference("revanced_alt_thumbnail_search",
+                summaryKey = null,
+                entriesKey = entries,
+                entryValuesKey = values
+            ),
+            NonInteractivePreference(
+                "revanced_alt_thumbnail_dearrow_about",
+                // Custom about preference with link to the DeArrow website.
+                tag = "app.revanced.integrations.youtube.settings.preference.AlternativeThumbnailsAboutDeArrowPreference",
+                selectable = true,
+            ),
+            SwitchPreference("revanced_alt_thumbnail_dearrow_connection_toast"),
+            TextPreference("revanced_alt_thumbnail_dearrow_api_url"),
+            NonInteractivePreference("revanced_alt_thumbnail_stills_about"),
+            SwitchPreference("revanced_alt_thumbnail_stills_fast"),
+            ListPreference("revanced_alt_thumbnail_stills_time", summaryKey = null)
         )
 
-        fun MethodFingerprint.getResultOrThrow() =
-            result ?: throw exception
-
         fun MethodFingerprint.alsoResolve(fingerprint: MethodFingerprint) =
-            also { resolve(context, fingerprint.getResultOrThrow().classDef) }.getResultOrThrow()
+            also { resolve(context, fingerprint.resultOrThrow().classDef) }.resultOrThrow()
 
         fun MethodFingerprint.resolveAndLetMutableMethod(
             fingerprint: MethodFingerprint,
-            block: (MutableMethod) -> Unit
+            block: (MutableMethod) -> Unit,
         ) = alsoResolve(fingerprint).also { block(it.mutableMethod) }
 
         MessageDigestImageUrlFingerprint.resolveAndLetMutableMethod(MessageDigestImageUrlParentFingerprint) {
@@ -246,7 +197,7 @@ object AlternativeThumbnailsPatch : BytecodePatch(
 
         // The URL is required for the failure callback hook, but the URL field is obfuscated.
         // Add a helper get method that returns the URL field.
-        RequestFingerprint.getResultOrThrow().apply {
+        RequestFingerprint.resultOrThrow().apply {
             // The url is the only string field that is set inside the constructor.
             val urlFieldInstruction = mutableMethod.getInstructions().first {
                 if (it.opcode != Opcode.IPUT_OBJECT) return@first false
@@ -267,15 +218,16 @@ object AlternativeThumbnailsPatch : BytecodePatch(
                     AccessFlags.PUBLIC.value,
                     null,
                     null,
-                    MutableMethodImplementation(2)
+                    MutableMethodImplementation(2),
                 ).toMutable().apply {
                     addInstructions(
                         """
-                        iget-object v0, p0, $definingClass->${urlFieldName}:Ljava/lang/String;
+                        iget-object v0, p0, $definingClass->$urlFieldName:Ljava/lang/String;
                         return-object v0
-                    """
+                    """,
                     )
-                })
+                },
+            )
         }
     }
 }

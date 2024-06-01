@@ -8,13 +8,13 @@ import app.revanced.patches.tumblr.featureflags.OverrideFeatureFlagsPatch
 import app.revanced.patches.tumblr.timelinefilter.TimelineFilterPatch
 
 @Patch(
-    name = "Disable Tumblr Live",
     description = "Disable the Tumblr Live tab button and dashboard carousel.",
     dependencies = [OverrideFeatureFlagsPatch::class, TimelineFilterPatch::class],
-    compatiblePackages = [CompatiblePackage("com.tumblr")]
+    compatiblePackages = [CompatiblePackage("com.tumblr")],
 )
+@Deprecated("Tumblr Live was removed and is no longer served in the feed, making this patch useless.")
 @Suppress("unused")
-object DisableTumblrLivePatch : BytecodePatch() {
+object DisableTumblrLivePatch : BytecodePatch(emptySet()) {
     override fun execute(context: BytecodeContext) {
         // Hide the LIVE_MARQUEE timeline element that appears in the feed
         // Called "live_marquee" in api response

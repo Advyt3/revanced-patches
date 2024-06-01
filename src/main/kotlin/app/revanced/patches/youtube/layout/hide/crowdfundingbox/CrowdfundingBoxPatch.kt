@@ -13,7 +13,7 @@ import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
 
 @Patch(
     name = "Hide crowdfunding box",
-    description = "Hides the crowdfunding box between the player and video description.",
+    description = "Adds an option to hide the crowdfunding box between the player and video description.",
     dependencies = [
         IntegrationsPatch::class,
         CrowdfundingBoxResourcePatch::class
@@ -27,8 +27,20 @@ import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
                 "18.38.44",
                 "18.43.45",
                 "18.44.41",
-                "18.45.41",
-                "18.45.43"
+                "18.45.43",
+                "18.48.39",
+                "18.49.37",
+                "19.01.34",
+                "19.02.39",
+                "19.03.36",
+                "19.04.38",
+                "19.05.36",
+                "19.06.39",
+                "19.07.40",
+                "19.08.36",
+                "19.09.38",
+                "19.10.39",
+                "19.11.43"
             ]
         )
     ]
@@ -38,7 +50,7 @@ object CrowdfundingBoxPatch : BytecodePatch(
     setOf(CrowdfundingBoxFingerprint)
 ) {
     private const val INTEGRATIONS_METHOD_DESCRIPTOR =
-        "Lapp/revanced/integrations/patches/HideCrowdfundingBoxPatch;->hideCrowdfundingBox(Landroid/view/View;)V"
+        "Lapp/revanced/integrations/youtube/patches/HideCrowdfundingBoxPatch;->hideCrowdfundingBox(Landroid/view/View;)V"
 
     override fun execute(context: BytecodeContext) {
         CrowdfundingBoxFingerprint.result?.let {
